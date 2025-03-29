@@ -1,8 +1,10 @@
 # main.py
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import classification_report
+import matplotlib.pyplot as plt
+import numpy as np
 
 # Load the UNSW-NB15 dataset
 # Replace the file paths with the actual paths to your training and testing CSV files
@@ -28,6 +30,25 @@ X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_
 model = RandomForestClassifier()
 model.fit(X_train, y_train)
 
+# Perform cross-validation (check for overfitting - asses the model's generalization ability)
+# Cross-validation to evaluate the model's performance
+scores = cross_val_score(model, X, y, cv=5, scoring='accuracy')
+print("Cross-validation scores:", scores)
+print("Mean accuracy:", scores.mean())
+
 # Make predictions and evaluate the model
 y_pred = model.predict(X_test)
 print(classification_report(y_test, y_pred))
+
+# Get feature importances (which are most important for the model's predictions)
+feature_importances = model.feature_importances_
+features = X.columns
+
+# Sort and plot
+indices = np.argsort(feature_importances)[::-1]
+plt.figure(figsize=(10, 6))
+plt.title("Feature Importances")
+plt.bar(range(X.shape[1]), feature_importances[indices], align="center")
+plt.xticks(range(X.shape[1]), features[indices], rotation=90)
+plt.tight_layout()
+plt.show()
