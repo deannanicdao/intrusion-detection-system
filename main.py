@@ -44,11 +44,18 @@ print(classification_report(y_test, y_pred))
 feature_importances = model.feature_importances_
 features = X.columns
 
-# Sort and plot
+# Sort and select top 10 important features
 indices = np.argsort(feature_importances)[::-1]
+important_features = features[indices][:10]  # Keep only the top 10 features
+X = X[important_features]
+
+# Plot feature importances for the top 10 features
 plt.figure(figsize=(10, 6))
-plt.title("Feature Importances")
-plt.bar(range(X.shape[1]), feature_importances[indices], align="center")
-plt.xticks(range(X.shape[1]), features[indices], rotation=90)
+plt.title("Feature Importances (Top 10)")
+plt.bar(range(len(important_features)), feature_importances[indices][:10], align="center")
+plt.xticks(range(len(important_features)), important_features, rotation=90)
 plt.tight_layout()
+plt.savefig("feature_importances.png")
 plt.show()
+
+
