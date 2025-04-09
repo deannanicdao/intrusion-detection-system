@@ -1,0 +1,5 @@
+# Ignore dataset files
+/path/to/dataset/
+*.csv
+*.json
+*.xlsx
