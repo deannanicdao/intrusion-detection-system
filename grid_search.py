@@ -18,7 +18,7 @@ param_grid = {
 rf = RandomForestClassifier(random_state=42)
 
 # Initialize GridSearchCV
-grid_search = GridSearchCV(estimator=rf, param_grid=param_grid, cv=5, scoring='accuracy', verbose=2, n_jobs=-1)
+grid_search = GridSearchCV(estimator=rf, param_grid=param_grid, cv=5, scoring='accuracy', verbose=2, n_jobs=2)
 
 # Fit GridSearchCV to the data
 grid_search.fit(X_train, y_train)

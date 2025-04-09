@@ -16,7 +16,12 @@ param_dist = {
 rf = RandomForestClassifier(random_state=42)
 
 # Initialize RandomizedSearchCV
-random_search = RandomizedSearchCV(estimator=rf, param_distributions=param_dist, n_iter=50, cv=5, scoring='accuracy', verbose=2, random_state=42, n_jobs=-1)
+# Note: jobs can be set to -1 to use all processors, or a specific number of processors
+# to limit the number of parallel jobs
+# n_iter is the number of different combinations to try
+# cv is the number of cross-validation folds, 5 here means each combination of hyperparameters 
+# will be evaluated 5 times (once for each fold) until all combinations in the parameter grid have been evaluated
+random_search = RandomizedSearchCV(estimator=rf, param_distributions=param_dist, n_iter=50, cv=5, scoring='accuracy', verbose=2, random_state=42, n_jobs=2)
 
 # Fit RandomizedSearchCV to the data
 random_search.fit(X_train, y_train)

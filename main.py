@@ -5,11 +5,35 @@ from sklearn.model_selection import train_test_split, cross_val_score
 from sklearn.metrics import classification_report
 import matplotlib.pyplot as plt
 import numpy as np
+from sklearn.preprocessing import LabelEncoder
 
 # Load the UNSW-NB15 dataset
 # Replace the file paths with the actual paths to your training and testing CSV files
 train_data = pd.read_csv("data/UNSW_NB15_training-set.csv")
 test_data = pd.read_csv("data/UNSW_NB15_testing-set.csv")
+
+# Load the unseen test dataset
+unseen_test_data = pd.read_csv("data/UNSW-NB15_1.csv", low_memory=False)
+
+print(unseen_test_data.columns)
+
+# Drop irrelevant or high-cardinality columns
+unseen_test_data = unseen_test_data.drop(['id'], axis=1, errors='ignore')
+
+# Apply LabelEncoder to categorical columns
+categorical_columns = ['protocol', 'service', 'state']  # Replace with actual column names
+label_encoders = {}
+for col in categorical_columns:
+    le = LabelEncoder()
+    unseen_test_data[col] = le.fit_transform(unseen_test_data[col].astype(str))
+    label_encoders[col] = le
+
+# Align columns with training data
+unseen_test_data = unseen_test_data.reindex(columns=X_train.columns, fill_value=0)
+
+# Split unseen test data into features and target
+X_unseen = unseen_test_data.drop('label', axis=1)
+y_unseen = unseen_test_data['label']
 
 # Combine training and testing data for preprocessing
 data = pd.concat([train_data, test_data], ignore_index=True)
@@ -27,7 +51,15 @@ y = data['label']  # Target (0 for normal, 1 for malicious)
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
 
 # Train a Random Forest model
-model = RandomForestClassifier()
+# Initialize the Random Forest model with best hyperparameters (using GridSearchCV or RandomizedSearchCV to find the best parameters)
+model = RandomForestClassifier(
+    max_depth=None,
+    max_features='sqrt',
+    min_samples_leaf=1,
+    min_samples_split=2,
+    n_estimators=200,
+    random_state=42
+)
 model.fit(X_train, y_train)
 
 # Perform cross-validation (check for overfitting - asses the model's generalization ability)
@@ -39,6 +71,17 @@ print("Mean accuracy:", scores.mean())
 # Make predictions and evaluate the model
 y_pred = model.predict(X_test)
 print(classification_report(y_test, y_pred))
+
+# Make predictions on the unseen test data
+y_unseen_pred = model.predict(X_unseen)
+
+# Evaluate the model's performance on the unseen test data
+print("Evaluation on Unseen Test Data:")
+print(classification_report(y_unseen, y_unseen_pred))
+
+# Save predictions to a CSV file
+unseen_test_data['predicted_label'] = y_unseen_pred
+unseen_test_data.to_csv("data/UNSW_NB15_unseen-test-predictions.csv", index=False)
 
 # Get feature importances (which are most important for the model's predictions)
 feature_importances = model.feature_importances_
