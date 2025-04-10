@@ -11,25 +11,36 @@ from sklearn.preprocessing import LabelEncoder
 # Replace the file paths with the actual paths to your training and testing CSV files
 train_data = pd.read_csv("data/UNSW_NB15_training-set.csv")
 test_data = pd.read_csv("data/UNSW_NB15_testing-set.csv")
+testing_columns = test_data.columns
+print(testing_columns)
 
 # Load the unseen test dataset
 unseen_test_data = pd.read_csv("data/UNSW-NB15_1.csv", low_memory=False)
+unseen_test_data_reordered = unseen_test_data.reindex(columns=testing_columns)
+unseen_test_data_reordered.to_csv("data/UNSW_NB15_unseen-test.csv", index=False)
 
+# Check the columns of the unseen test data to ensure they match the training data
+print("Unseen Test Data Columns:")
 print(unseen_test_data.columns)
 
 # Drop irrelevant or high-cardinality columns
 unseen_test_data = unseen_test_data.drop(['id'], axis=1, errors='ignore')
 
-# Apply LabelEncoder to categorical columns
-categorical_columns = ['protocol', 'service', 'state']  # Replace with actual column names
+# Define categorical columns (update based on actual column names)
+categorical_columns = ['proto', 'service', 'state']  # Replace with actual column names
 label_encoders = {}
-for col in categorical_columns:
-    le = LabelEncoder()
-    unseen_test_data[col] = le.fit_transform(unseen_test_data[col].astype(str))
-    label_encoders[col] = le
 
-# Align columns with training data
-unseen_test_data = unseen_test_data.reindex(columns=X_train.columns, fill_value=0)
+# Apply LabelEncoder to existing columns
+for col in categorical_columns:
+    if col in unseen_test_data.columns:
+        le = LabelEncoder()
+        unseen_test_data[col] = le.fit_transform(unseen_test_data[col].astype(str))
+        label_encoders[col] = le
+    else:
+        print(f"Column '{col}' not found in unseen_test_data. Skipping...")
+
+# Reorder columns to match the testing dataset
+unseen_test_data = unseen_test_data.reindex(columns=testing_columns, fill_value=0)
 
 # Split unseen test data into features and target
 X_unseen = unseen_test_data.drop('label', axis=1)
