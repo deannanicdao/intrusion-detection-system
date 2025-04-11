@@ -6,6 +6,10 @@ from sklearn.metrics import classification_report
 import matplotlib.pyplot as plt
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
+from imblearn.over_sampling import SMOTE
+import os
+
+os.environ["LOKY_MAX_CPU_COUNT"] = "4"  # Replace 4 with the number of cores you want to use
 
 # Load the UNSW-NB15 dataset
 # Replace the file paths with the actual paths to your training and testing CSV files
@@ -14,45 +18,46 @@ test_data = pd.read_csv("data/UNSW_NB15_testing-set.csv")
 testing_columns = test_data.columns
 print(testing_columns)
 
-# Load the unseen test dataset
-unseen_test_data = pd.read_csv("data/UNSW-NB15_1.csv", low_memory=False)
-unseen_test_data_reordered = unseen_test_data.reindex(columns=testing_columns)
-unseen_test_data_reordered.to_csv("data/UNSW_NB15_unseen-test.csv", index=False)
-
-# Check the columns of the unseen test data to ensure they match the training data
-print("Unseen Test Data Columns:")
-print(unseen_test_data.columns)
-
-# Drop irrelevant or high-cardinality columns
-unseen_test_data = unseen_test_data.drop(['id'], axis=1, errors='ignore')
-
-# Define categorical columns (update based on actual column names)
-categorical_columns = ['proto', 'service', 'state']  # Replace with actual column names
-label_encoders = {}
-
-# Apply LabelEncoder to existing columns
-for col in categorical_columns:
-    if col in unseen_test_data.columns:
-        le = LabelEncoder()
-        unseen_test_data[col] = le.fit_transform(unseen_test_data[col].astype(str))
-        label_encoders[col] = le
-    else:
-        print(f"Column '{col}' not found in unseen_test_data. Skipping...")
-
-# Reorder columns to match the testing dataset
-unseen_test_data = unseen_test_data.reindex(columns=testing_columns, fill_value=0)
-
-# Split unseen test data into features and target
-X_unseen = unseen_test_data.drop('label', axis=1)
-y_unseen = unseen_test_data['label']
-
 # Combine training and testing data for preprocessing
 data = pd.concat([train_data, test_data], ignore_index=True)
 
 # Preprocess data
 # Drop irrelevant columns (e.g., 'id') and handle categorical features
-data = data.drop(['id'], axis=1)  # Drop the 'id' column
 data = pd.get_dummies(data, drop_first=True)  # One-hot encode categorical features
+
+# Preprocess training data
+X_train = train_data.drop('label', axis=1)
+y_train = train_data['label']
+X_train = pd.get_dummies(X_train, drop_first=True)
+
+# Preprocess test data
+X_test = test_data.drop('label', axis=1)
+y_test = test_data['label']
+X_test = pd.get_dummies(X_test, drop_first=True)
+
+# Align columns in X_train and X_test to ensure they have the same features
+X_train, X_test = X_train.align(X_test, join='left', axis=1, fill_value=0)
+
+# Identify categorical columns
+categorical_columns = X_train.select_dtypes(include=['object']).columns
+
+# Apply Label Encoding to categorical columns
+label_encoders = {}
+for col in categorical_columns:
+    le = LabelEncoder()
+    X_train[col] = le.fit_transform(X_train[col].astype(str))
+    label_encoders[col] = le
+
+# Apply SMOTE to the training data
+smote = SMOTE(random_state=42)
+X_train_resampled, y_train_resampled = smote.fit_resample(X_train, y_train)
+
+# Combine resampled features and target into a new DataFrame (optional, for saving or inspection)
+resampled_data = pd.concat([pd.DataFrame(X_train_resampled, columns=X_train.columns), 
+                            pd.DataFrame(y_train_resampled, columns=['label'])], axis=1)
+
+# Save the resampled dataset (optional)
+resampled_data.to_csv("data/UNSW_NB15_resampled.csv", index=False)
 
 # Split data into features (X) and target (y)
 X = data.drop('label', axis=1)  # Features
@@ -71,7 +76,7 @@ model = RandomForestClassifier(
     n_estimators=200,
     random_state=42
 )
-model.fit(X_train, y_train)
+model.fit(X_train_resampled, y_train_resampled)
 
 # Perform cross-validation (check for overfitting - asses the model's generalization ability)
 # Cross-validation to evaluate the model's performance
@@ -83,16 +88,25 @@ print("Mean accuracy:", scores.mean())
 y_pred = model.predict(X_test)
 print(classification_report(y_test, y_pred))
 
-# Make predictions on the unseen test data
-y_unseen_pred = model.predict(X_unseen)
+# Generate the classification report as a dictionary
+report = classification_report(y_test, y_pred, output_dict=True)
 
-# Evaluate the model's performance on the unseen test data
-print("Evaluation on Unseen Test Data:")
-print(classification_report(y_unseen, y_unseen_pred))
+# Convert the report to a DataFrame for visualization
+report_df = pd.DataFrame(report).transpose()
 
-# Save predictions to a CSV file
-unseen_test_data['predicted_label'] = y_unseen_pred
-unseen_test_data.to_csv("data/UNSW_NB15_unseen-test-predictions.csv", index=False)
+# Plot precision, recall, and F1-score for each class
+metrics = ['precision', 'recall', 'f1-score']
+report_df = report_df.loc[['0', '1'], metrics]  # Select only class 0 and 1
+
+report_df.plot(kind='bar', figsize=(8, 6))
+plt.title("Classification Metrics by Class")
+plt.xlabel("Class")
+plt.ylabel("Score")
+plt.xticks(rotation=0)
+plt.legend(loc="lower right")
+plt.tight_layout()
+plt.savefig("classification_metrics.png")
+plt.show()
 
 # Get feature importances (which are most important for the model's predictions)
 feature_importances = model.feature_importances_
